@@ -149,7 +149,7 @@ UINT ImageProcess::rotatePicture(LPVOID  p)
 	int maxHeight = param->src->GetHeight();
 	//输入参数
 	double theta = 15 * DegreesToRadians;// 旋转的角度
-	short type = 0;	//0 最近邻内插值 ;1 三阶插值
+	short type = 1;	//0 最近邻内插值 ;1 二阶线性插值;2 三阶插值
 
 	int startIndex = param->startIndex;
 	int endIndex = param->endIndex;
@@ -166,22 +166,36 @@ UINT ImageProcess::rotatePicture(LPVOID  p)
 		//v,w是原图像中像素的坐标
 		//int v = x*cos(theta) + y*sin(theta);
 		//int w = (-1)*x*sin(theta) + y*cos(theta);
-		int v = x*cos(theta) + y*sin(theta) + cos(theta)*(-1)*(maxWidth / 2) + sin(theta)*(-1)*(maxHeight / 2) - (-1)*maxWidth / 2;
-		int w = (-1)*x*sin(theta) + y*cos(theta) + cos(theta)*(-1)*(maxHeight / 2) - sin(theta)*(-1)*(maxWidth / 2) - (-1)*maxHeight / 2;
+		//经过旋转后的v,w极有可能带有小数
+		double real_v = x*cos(theta) + y*sin(theta) + cos(theta)*(-1)*(maxWidth / 2) + sin(theta)*(-1)*(maxHeight / 2) - (-1)*maxWidth / 2;
+		double real_w = (-1)*x*sin(theta) + y*cos(theta) + cos(theta)*(-1)*(maxHeight / 2) - sin(theta)*(-1)*(maxWidth / 2) - (-1)*maxHeight / 2;
 		//在每一个位置（x,y）使用(v,w) = T^(-1)(x,y)计算输入图像中的相应位置 
-		int value;
+		int value = 0;
+		int v, w;
 		for (int off = 0; off < bitCount; off++) {//RGB图后面的其他通道赋值
-			if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0) {//若没超出边界的话
-				if (type == 0)//最近邻内插值
-					value = *(pOriginData + pit * w + v * bitCount + off);
-				else {//三阶插值
-					double temp = 0;
-					if (v >= 1 && v < maxWidth - 1 && w >= 1 && w < maxHeight - 1)//防止越界
-						for (int i = -1; i < 2; i++)//Mask应用
-							for (int j = -1; j < 2; j++)
-								temp += *(pOriginData + pit * (w + i) + (v + j) * bitCount + off);
-					value = temp / 9;
-				}
+			if (type == 0) {//最近邻内插值
+				//取最近的点 double转为int或许是直接舍去小数部分 这里不确定
+				v = real_v;
+				w = real_w;
+				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//若没超出边界的话
+				    value = *(pOriginData + pit * w + v * bitCount + off);
+			}
+			else if (type == 1) {//双线性插值 f(x , y) = f(X + u, Y + v) =f (X, Y)  * (1 - u) * (1 - v) + f(X, Y + 1) * (1 - u) * v + f(X + 1, Y) * u * (1 - v) + f (X + 1, Y + 1) * u * v;
+				//取整数部分
+				v = floor(real_v);
+				w = floor(real_w);
+				//设u与k分别为X + u，Y + k的小数部分
+				double u = real_v - v;
+				double k = real_w - w;
+				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//若没超出边界的话
+					if (v >= 1 && v < maxWidth - 1 && w >= 1 && w < maxHeight - 1) {//防止越界
+						//正确实现二阶线性插值
+						value = 0;
+						value += (*(pOriginData + pit * (w)+(v)* bitCount + off))*(1 - u)*(1 - k);
+						value += (*(pOriginData + pit * (w + 1) + (v)* bitCount + off))*(1 - u)*(k);
+						value += (*(pOriginData + pit * (w)+(v + 1)* bitCount + off))*(u)*(1 - k);
+						value += (*(pOriginData + pit * (w + 1) + (v + 1)* bitCount + off))*(u)*(k);
+					}
 			}
 			*(pRealData + pit * y + x * bitCount + off) = value;
 		}
@@ -196,8 +210,8 @@ UINT ImageProcess::zoomPicture(LPVOID  p)
 	int maxWidth = param->src->GetWidth();
 	int maxHeight = param->src->GetHeight();
 	//输入参数
-	double factor = 0.5;// 旋转的角度
-	short type = 0;//0 最近邻内插值 ;1 三阶插值
+	double factor = 1.5;// 缩放的大小
+	short type = 1;//0 最近邻内插值 ;1 二阶线性插值
 
 	int startIndex = param->startIndex;
 	int endIndex = param->endIndex;
@@ -211,22 +225,35 @@ UINT ImageProcess::zoomPicture(LPVOID  p)
 		int x = i % maxWidth;
 		int y = i / maxWidth;
 		//v,w是原图像中像素的坐标
-		int v = x*factor;
-		int w = y*factor;
+		double real_v = x*factor;
+		double real_w = y*factor;
 		//在每一个位置（x,y）使用(v,w) = T^(-1)(x,y)计算输入图像中的相应位置 
-		int value;
+		int value = 0;
+		int v, w;
 		for (int off = 0; off < bitCount; off++) {//RGB图后面的其他通道赋值
-			if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0) {//若没超出边界的话
-				if (type == 0)//最近邻内插值
+			if (type == 0) {//最近邻内插值
+							//取最近的点 double转为int或许是直接舍去小数部分 这里不确定
+				v = real_v;
+				w = real_w;
+				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//若没超出边界的话
 					value = *(pOriginData + pit * w + v * bitCount + off);
-				else {
-					double temp = 0;
-					if (v >= 1 && v < maxWidth - 1 && w >= 1 && w < maxHeight - 1)//防止越界
-						for (int i = -1; i < 2; i++)//Mask应用
-							for (int j = -1; j < 2; j++)
-								temp += *(pOriginData + pit * (w + i) + (v + j) * bitCount + off);
-					value = temp / 9;
-				}
+			}
+			else if (type == 1) {//双线性插值 f(x , y) = f(X + u, Y + v) =f (X, Y)  * (1 - u) * (1 - v) + f(X, Y + 1) * (1 - u) * v + f(X + 1, Y) * u * (1 - v) + f (X + 1, Y + 1) * u * v;
+								 //取整数部分
+				v = floor(real_v);
+				w = floor(real_w);
+				//设u与k分别为X + u，Y + k的小数部分
+				double u = real_v - v;
+				double k = real_w - w;
+				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//若没超出边界的话
+					if (v >= 1 && v < maxWidth - 1 && w >= 1 && w < maxHeight - 1) {//防止越界
+																					//正确实现二阶线性插值
+						value = 0;
+						value += (*(pOriginData + pit * (w)+(v)* bitCount + off))*(1 - u)*(1 - k);
+						value += (*(pOriginData + pit * (w + 1) + (v)* bitCount + off))*(1 - u)*(k);
+						value += (*(pOriginData + pit * (w)+(v + 1)* bitCount + off))*(u)*(1 - k);
+						value += (*(pOriginData + pit * (w + 1) + (v + 1)* bitCount + off))*(u)*(k);
+					}
 			}
 			*(pRealData + pit * y + x * bitCount + off) = value;
 		}
