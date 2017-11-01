@@ -36,6 +36,9 @@ public:
 	CImage* getImage() { return m_pImgSrc; }
 	void MedianFilter();
 	void AddNoise();
+	void WhiteBalance();
+	void ImageFusion();
+	void ColorBalance();
 	void RotateImage();
 	void ZoomImage();
 	void AddNoise_WIN();
@@ -44,6 +47,9 @@ public:
 	void ImageCopy(CImage* pImgSrc, CImage* pImgDrt);
 	void MedianFilter_WIN();
 	void Rotate_WIN();
+	void WhiteBalance_WIN();
+	void ImageFusion_WIN();
+	void ColorBalance_WIN();
 	afx_msg
 		void Zoom_WIN();
 	LRESULT OnMedianFilterThreadMsgReceived(WPARAM wParam, LPARAM lParam);

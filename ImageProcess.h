@@ -23,6 +23,9 @@ class ImageProcess
 public:
 	static UINT medianFilter(LPVOID  param);
 	static UINT addNoise(LPVOID param);
+	static UINT whiteBalance(LPVOID p);
+	static UINT colorBalance(LPVOID p);
+	static UINT imageFusion(LPVOID p);
 	static UINT rotatePicture(LPVOID p);
 	static UINT zoomPicture(LPVOID p);
 };

@@ -1,13 +1,13 @@
-#include "stdafx.h"
+ï»¿#include "stdafx.h"
 #include "ImageProcess.h"
 #include <vector>
 #include <algorithm>
 
 static bool GetValue(int p[], int size, int &value)
 {
-	//Êı×éÖĞ¼äµÄÖµ
+	//æ•°ç»„ä¸­é—´çš„å€¼
 	int zxy = p[(size - 1) / 2];
-	//ÓÃÓÚ¼ÇÂ¼Ô­Êı×éµÄÏÂ±ê
+	//ç”¨äºè®°å½•åŸæ•°ç»„çš„ä¸‹æ ‡
 	int *a = new int[size];
 	int index = 0;
 	for (int i = 0; i < size; ++i)
@@ -43,9 +43,9 @@ static bool GetValue(int p[], int size, int &value)
 
 }
 
-//Ê¹µÃ×ø±êÖµ²»³¬¹ıÍ¼ÏñµÄ×î´óÖµ
+//ä½¿å¾—åæ ‡å€¼ä¸è¶…è¿‡å›¾åƒçš„æœ€å¤§å€¼
 int normaliseXY(int x, int y, int max_x, int max_y) {
-	if (x >= max_x || x <= 0 || y >= max_y || y <= 0) //³¬³ö±ß½çµÄ²¿·ÖÓÃºÚÉ«Ìî³ä
+	if (x >= max_x || x <= 0 || y >= max_y || y <= 0) //è¶…å‡ºè¾¹ç•Œçš„éƒ¨åˆ†ç”¨é»‘è‰²å¡«å……
 		return 0;
 	return x;
 }
@@ -65,7 +65,7 @@ UINT ImageProcess::medianFilter(LPVOID  p)
 	int pit = param->src->GetPitch();
 	int bitCount = param->src->GetBPP() / 8;
 
-	int *pixel = new int[maxLength];//´æ´¢Ã¿¸öÏñËØµãµÄ»Ò¶È
+	int *pixel = new int[maxLength];//å­˜å‚¨æ¯ä¸ªåƒç´ ç‚¹çš„ç°åº¦
 	int *pixelR = new int[maxLength];
 	int *pixelB = new int[maxLength];
 	int *pixelG = new int[maxLength];
@@ -140,56 +140,206 @@ UINT ImageProcess::medianFilter(LPVOID  p)
 	return 0;
 }
 
-//ÔÚ¶àÏß³Ì³ÌĞòÖĞ²»ÄÜÓÃÈ«¾Ö±äÁ¿£¬»áÓĞÊ±ĞòÎÊÌâ
+//åœ¨å¤šçº¿ç¨‹ç¨‹åºä¸­ä¸èƒ½ç”¨å…¨å±€å˜é‡ï¼Œä¼šæœ‰æ—¶åºé—®é¢˜
 //***
+float BiCubicPoly(float x)
+{
+	float abs_x = abs(x);
+	float a = -0.5;
+	if (abs_x <= 1.0)
+	{
+		return (a + 2)*pow(abs_x, 3) - (a + 3)*pow(abs_x, 2) + 1;
+	}
+	else if (abs_x < 2.0)
+	{
+		return a*pow(abs_x, 3) - 5 * a*pow(abs_x, 2) + 8 * a*abs_x - 4 * a;
+	}
+	else
+		return 0.0;
+}
+
+int checkColorSpace(double x) {
+	if (x > 255)
+		return 255;
+	if (x < 0)
+		return 0;
+	return x;
+}
+UINT ImageProcess::whiteBalance(LPVOID  p)
+{
+	ThreadParam* param = (ThreadParam*)p;
+	//å›¾åƒçš„æ•´ä¸ªå®½åº¦å’Œé«˜åº¦
+	int maxWidth = param->src->GetWidth();
+	int maxHeight = param->src->GetHeight();
+
+	int startIndex = param->startIndex;
+	int endIndex = param->endIndex;
+	//GetBits() è·å¾—æ•°æ®åŒºçš„æŒ‡é’ˆ
+	byte* pRealData = (byte*)param->src->GetBits();
+	//GetBPP() è¿”å›æ¯ä¸ªåƒç´ æ‰€å çš„bitæ•°ï¼Œåœ¨è¿™é‡Œ/8æ„å‘³ç€bitCountæ˜¯æ¯ä¸ªåƒç´ æ‰€å çš„byteæ•°
+	int bitCount = param->src->GetBPP() / 8;
+	//è·å¾—å›¾åƒæ•°æ®æ¯ä¸€è¡Œçš„å­—èŠ‚æ•°
+	//The pitch of the image.If the return value is negative, the bitmap is a bottom - up DIB and its origin is the lower left corner.
+	//	If the return value is positive, the bitmap is a top - down DIB and its origin is the upper left corner.
+	int pit = param->src->GetPitch();
+	double R = 0, G = 0, B = 0;//æ•´ä¸ªå›¾åƒçš„RGBåˆ†é‡æ€»å’Œ
+	for (int i = startIndex; i <= endIndex; ++i)
+	{
+		int x = i % maxWidth;
+		int y = i / maxWidth;
+		B += *(pRealData + pit * y + x * bitCount + 0);
+		G += *(pRealData + pit * y + x * bitCount + 1);
+		R += *(pRealData + pit * y + x * bitCount + 2);
+	}
+	//éœ€è¦è°ƒæ•´çš„RGBåˆ†é‡çš„å¢ç›ŠÂ Â 
+	double KB = (R+ G+ B) / (3 * B);
+	double KG = (R+ G+ B) / (3 * G);
+	double KR = (R+ G+ B) / (3 * R);
+	for (int i = startIndex; i <= endIndex; ++i)
+	{
+		int x = i % maxWidth;
+		int y = i / maxWidth;
+		*(pRealData + pit * y + x * bitCount + 0) = checkColorSpace(*(pRealData + pit * y + x * bitCount + 0)*KB);
+		*(pRealData + pit * y + x * bitCount + 1) = checkColorSpace(*(pRealData + pit * y + x * bitCount + 1)*KG);
+		*(pRealData + pit * y + x * bitCount + 2) = checkColorSpace(*(pRealData + pit * y + x * bitCount + 2)*KR);
+	}
+
+	::PostMessage(AfxGetMainWnd()->GetSafeHwnd(), WM_NOISE, 1, NULL);
+	return 0;
+}
+UINT ImageProcess::colorBalance(LPVOID  p)
+{
+	//è¾“å…¥å‚æ•°
+	int shadow = 40;//è¾“å…¥é»‘åœº
+	int highlight = 200;//è¾“å…¥ç™½åœº
+	double midtones = 0.5;//è¾“å…¥ç°åœº ???
+	int outHightlight = 255;
+	int outShadow = 0;
+
+
+	ThreadParam* param = (ThreadParam*)p;
+	//å›¾åƒçš„æ•´ä¸ªå®½åº¦å’Œé«˜åº¦
+	int maxWidth = param->src->GetWidth();
+	int maxHeight = param->src->GetHeight();
+
+	int startIndex = param->startIndex;
+	int endIndex = param->endIndex;
+	//GetBits() è·å¾—æ•°æ®åŒºçš„æŒ‡é’ˆ
+	byte* pRealData = (byte*)param->src->GetBits();
+	//GetBPP() è¿”å›æ¯ä¸ªåƒç´ æ‰€å çš„bitæ•°ï¼Œåœ¨è¿™é‡Œ/8æ„å‘³ç€bitCountæ˜¯æ¯ä¸ªåƒç´ æ‰€å çš„byteæ•°
+	int bitCount = param->src->GetBPP() / 8;
+	//è·å¾—å›¾åƒæ•°æ®æ¯ä¸€è¡Œçš„å­—èŠ‚æ•°
+	//The pitch of the image.If the return value is negative, the bitmap is a bottom - up DIB and its origin is the lower left corner.
+	//	If the return value is positive, the bitmap is a top - down DIB and its origin is the upper left corner.
+	int pit = param->src->GetPitch();
+	int diff = highlight - shadow;
+	double rgbDiff, clRGB, outCIRGB;
+	for (int i = startIndex; i <= endIndex; ++i)
+	{
+		int x = i % maxWidth;
+		int y = i / maxWidth;
+		for (int off = 0; off < bitCount; off++) {//bitCount = 1 æ„å‘³ç€è¿™æ˜¯ç°åº¦å›¾255ä½ï¼Œè‹¥bitCount = 3 åˆ™æ„å‘³ç€è¿™æ˜¯RGBï¼ˆæ¯”å¦‚ï¼‰å›¾ï¼Œå°†åˆ†åˆ«å¯¹3byteçš„æ•°æ®ä¸€byteä¸€byteèµ‹å€¼
+			rgbDiff = *(pRealData + pit * y + x * bitCount + off) - shadow;
+			//clRGB = pow(rgbDiff / diff, 1 / midtones);
+			//outCIRGB = clRGB*(outHightlight - outShadow) / 255 + outShadow;
+			//çº¿æ€§æ˜ å°„
+			if (rgbDiff <= 0)
+				outCIRGB = outShadow;
+			else if(rgbDiff >= diff)
+				outCIRGB = outHightlight;
+			else outCIRGB = outShadow + rgbDiff / diff*(outHightlight - outShadow);
+			*(pRealData + pit * y + x * bitCount + off) = checkColorSpace(outCIRGB);
+		}
+	}
+	::PostMessage(AfxGetMainWnd()->GetSafeHwnd(), WM_NOISE, 1, NULL);
+	return 0;
+}
+UINT ImageProcess::imageFusion(LPVOID  p)
+{
+	//è¾“å…¥å‚æ•°
+	double alpha = 0.5;
+
+	ThreadParam* param = (ThreadParam*)p;
+	//å›¾åƒçš„æ•´ä¸ªå®½åº¦å’Œé«˜åº¦
+	int maxWidth = param->src->GetWidth();
+	int maxHeight = param->src->GetHeight();
+
+	int startIndex = param->startIndex;
+	int endIndex = param->endIndex;
+	//GetBits() è·å¾—æ•°æ®åŒºçš„æŒ‡é’ˆ
+	byte* pRealData = (byte*)param->src->GetBits();
+	byte* pOriginData = (byte*)param->origin_src->GetBits();//param->origin_srcæŒ‡çš„æ˜¯ç¬¬äºŒå¼ å›¾ç‰‡
+	//GetBPP() è¿”å›æ¯ä¸ªåƒç´ æ‰€å çš„bitæ•°ï¼Œåœ¨è¿™é‡Œ/8æ„å‘³ç€bitCountæ˜¯æ¯ä¸ªåƒç´ æ‰€å çš„byteæ•°
+	int bitCount = param->src->GetBPP() / 8;
+	//è·å¾—å›¾åƒæ•°æ®æ¯ä¸€è¡Œçš„å­—èŠ‚æ•°
+	//The pitch of the image.If the return value is negative, the bitmap is a bottom - up DIB and its origin is the lower left corner.
+	//	If the return value is positive, the bitmap is a top - down DIB and its origin is the upper left corner.
+	int pit = param->src->GetPitch();
+	for (int i = startIndex; i <= endIndex; ++i)
+	{
+		int x = i % maxWidth;
+		int y = i / maxWidth;
+		double value;
+		for (int off = 0; off < bitCount; off++) {//bitCount = 1 æ„å‘³ç€è¿™æ˜¯ç°åº¦å›¾255ä½ï¼Œè‹¥bitCount = 3 åˆ™æ„å‘³ç€è¿™æ˜¯RGBï¼ˆæ¯”å¦‚ï¼‰å›¾ï¼Œå°†åˆ†åˆ«å¯¹3byteçš„æ•°æ®ä¸€byteä¸€byteèµ‹å€¼
+			double P1 = *(pRealData + pit * y + x * bitCount + off);
+			double P2 = *(pOriginData + pit * y + x * bitCount + off);
+			value = P1*alpha + (1-alpha)*P2;
+			*(pRealData + pit * y + x * bitCount + off) = checkColorSpace(value);
+		}
+	}
+	::PostMessage(AfxGetMainWnd()->GetSafeHwnd(), WM_NOISE, 1, NULL);
+	return 0;
+}
+
 UINT ImageProcess::rotatePicture(LPVOID  p)
 {
+	//è¾“å…¥å‚æ•°
+	double theta = 15 * DegreesToRadians;// æ—‹è½¬çš„è§’åº¦
+	short type = 2;	//0 æœ€è¿‘é‚»å†…æ’å€¼ ;1 äºŒé˜¶çº¿æ€§æ’å€¼;2 ä¸‰é˜¶æ’å€¼
+
 	ThreadParam* param = (ThreadParam*)p;
 	int maxWidth = param->src->GetWidth();
 	int maxHeight = param->src->GetHeight();
-	//ÊäÈë²ÎÊı
-	double theta = 15 * DegreesToRadians;// Ğı×ªµÄ½Ç¶È
-	short type = 1;	//0 ×î½üÁÚÄÚ²åÖµ ;1 ¶ş½×ÏßĞÔ²åÖµ;2 Èı½×²åÖµ
 
 	int startIndex = param->startIndex;
 	int endIndex = param->endIndex;
 	byte* pRealData = (byte*)param->src->GetBits();
-	byte* pOriginData = (byte*)param->origin_src->GetBits();//param->origin_srcÖ¸µÄÊÇÔ­Í¼Ïñ£¬ÕâÀï²»»á¶ÔËü½øĞĞ²Ù×÷
+	byte* pOriginData = (byte*)param->origin_src->GetBits();//param->origin_srcæŒ‡çš„æ˜¯åŸå›¾åƒï¼Œè¿™é‡Œä¸ä¼šå¯¹å®ƒè¿›è¡Œæ“ä½œ
 	int bitCount = param->src->GetBPP() / 8;
 	int pit = param->src->GetPitch();
-	for (int i = startIndex; i <= endIndex; ++i)//É¨ÃèÊä³öÏñËØµÄÎ»ÖÃ£¬²¢ÔÚÃ¿Ò»¸öÎ»ÖÃ£¨x,y£©Ê¹ÓÃ(v,w) = T^(-1)(x,y)¼ÆËãÊäÈëÍ¼ÏñÖĞµÄÏàÓ¦Î»ÖÃ
+	for (int i = startIndex; i <= endIndex; ++i)//æ‰«æè¾“å‡ºåƒç´ çš„ä½ç½®ï¼Œå¹¶åœ¨æ¯ä¸€ä¸ªä½ç½®ï¼ˆx,yï¼‰ä½¿ç”¨(v,w) = T^(-1)(x,y)è®¡ç®—è¾“å…¥å›¾åƒä¸­çš„ç›¸åº”ä½ç½®
 	{
-		//x,yÊÇÏñËØµÄË÷Òı?
+		//x,yæ˜¯åƒç´ çš„ç´¢å¼•?
 		int x = i % maxWidth;
 		int y = i / maxWidth;
 
-		//v,wÊÇÔ­Í¼ÏñÖĞÏñËØµÄ×ø±ê
+		//v,wæ˜¯åŸå›¾åƒä¸­åƒç´ çš„åæ ‡
 		//int v = x*cos(theta) + y*sin(theta);
 		//int w = (-1)*x*sin(theta) + y*cos(theta);
-		//¾­¹ıĞı×ªºóµÄv,w¼«ÓĞ¿ÉÄÜ´øÓĞĞ¡Êı
+		//ç»è¿‡æ—‹è½¬åçš„v,wææœ‰å¯èƒ½å¸¦æœ‰å°æ•°
 		double real_v = x*cos(theta) + y*sin(theta) + cos(theta)*(-1)*(maxWidth / 2) + sin(theta)*(-1)*(maxHeight / 2) - (-1)*maxWidth / 2;
 		double real_w = (-1)*x*sin(theta) + y*cos(theta) + cos(theta)*(-1)*(maxHeight / 2) - sin(theta)*(-1)*(maxWidth / 2) - (-1)*maxHeight / 2;
-		//ÔÚÃ¿Ò»¸öÎ»ÖÃ£¨x,y£©Ê¹ÓÃ(v,w) = T^(-1)(x,y)¼ÆËãÊäÈëÍ¼ÏñÖĞµÄÏàÓ¦Î»ÖÃ 
-		int value = 0;
+		//åœ¨æ¯ä¸€ä¸ªä½ç½®ï¼ˆx,yï¼‰ä½¿ç”¨(v,w) = T^(-1)(x,y)è®¡ç®—è¾“å…¥å›¾åƒä¸­çš„ç›¸åº”ä½ç½® 
+		double value = 0;
 		int v, w;
-		for (int off = 0; off < bitCount; off++) {//RGBÍ¼ºóÃæµÄÆäËûÍ¨µÀ¸³Öµ
-			if (type == 0) {//×î½üÁÚÄÚ²åÖµ
-				//È¡×î½üµÄµã double×ªÎªint»òĞíÊÇÖ±½ÓÉáÈ¥Ğ¡Êı²¿·Ö ÕâÀï²»È·¶¨
+		for (int off = 0; off < bitCount; off++) {//bitCount = 1 æ„å‘³ç€è¿™æ˜¯ç°åº¦å›¾255ä½ï¼Œè‹¥bitCount = 3 åˆ™æ„å‘³ç€è¿™æ˜¯RGBï¼ˆæ¯”å¦‚ï¼‰å›¾ï¼Œå°†åˆ†åˆ«å¯¹3byteçš„æ•°æ®ä¸€byteä¸€byteèµ‹å€¼
+			if (type == 0) {//æœ€è¿‘é‚»å†…æ’å€¼
+				//å–æœ€è¿‘çš„ç‚¹ doubleè½¬ä¸ºintæˆ–è®¸æ˜¯ç›´æ¥èˆå»å°æ•°éƒ¨åˆ† è¿™é‡Œä¸ç¡®å®š
 				v = real_v;
 				w = real_w;
-				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//ÈôÃ»³¬³ö±ß½çµÄ»°
+				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//è‹¥æ²¡è¶…å‡ºè¾¹ç•Œçš„è¯
 				    value = *(pOriginData + pit * w + v * bitCount + off);
 			}
-			else if (type == 1) {//Ë«ÏßĞÔ²åÖµ f(x , y) = f(X + u, Y + v) =f (X, Y)  * (1 - u) * (1 - v) + f(X, Y + 1) * (1 - u) * v + f(X + 1, Y) * u * (1 - v) + f (X + 1, Y + 1) * u * v;
-				//È¡ÕûÊı²¿·Ö
+			else if (type == 1) {//åŒçº¿æ€§æ’å€¼ f(x , y) = f(X + u, Y + v) =f (X, Y)  * (1 - u) * (1 - v) + f(X, Y + 1) * (1 - u) * v + f(X + 1, Y) * u * (1 - v) + f (X + 1, Y + 1) * u * v;
+				//å–æ•´æ•°éƒ¨åˆ†
 				v = floor(real_v);
 				w = floor(real_w);
-				//ÉèuÓëk·Ö±ğÎªX + u£¬Y + kµÄĞ¡Êı²¿·Ö
+				//è®¾uä¸kåˆ†åˆ«ä¸ºX + uï¼ŒY + kçš„å°æ•°éƒ¨åˆ†
 				double u = real_v - v;
 				double k = real_w - w;
-				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//ÈôÃ»³¬³ö±ß½çµÄ»°
-					if (v >= 1 && v < maxWidth - 1 && w >= 1 && w < maxHeight - 1) {//·ÀÖ¹Ô½½ç
-						//ÕıÈ·ÊµÏÖ¶ş½×ÏßĞÔ²åÖµ
+				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//è‹¥æ²¡è¶…å‡ºè¾¹ç•Œçš„è¯
+					if (v >= 1 && v < maxWidth - 1 && w >= 1 && w < maxHeight - 1) {//é˜²æ­¢è¶Šç•Œ
+						//æ­£ç¡®å®ç°äºŒé˜¶çº¿æ€§æ’å€¼
 						value = 0;
 						value += (*(pOriginData + pit * (w)+(v)* bitCount + off))*(1 - u)*(1 - k);
 						value += (*(pOriginData + pit * (w + 1) + (v)* bitCount + off))*(1 - u)*(k);
@@ -197,6 +347,21 @@ UINT ImageProcess::rotatePicture(LPVOID  p)
 						value += (*(pOriginData + pit * (w + 1) + (v + 1)* bitCount + off))*(u)*(k);
 					}
 			}
+			else if (type == 2) {//åŒä¸‰æ¬¡å†…æ’
+				//å–æ•´æ•°éƒ¨åˆ†
+				v = floor(real_v);
+				w = floor(real_w);
+				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//è‹¥æ²¡è¶…å‡ºè¾¹ç•Œçš„è¯
+					if (v >= 2 && v < maxWidth - 2 && w >= 2 && w < maxHeight - 2) {//é˜²æ­¢è¶Šç•Œ														
+						//å®ç°åŒä¸‰æ¬¡å†…æ’
+						value = 0;
+						//4*4é¢†åŸŸç‚¹æ“ä½œ
+						for(int i=-1;i<3;i++)
+							for(int j=-1;j<3;j++)
+								value += (*(pOriginData + pit * (w+i)+(v+j)* bitCount + off))*BiCubicPoly(real_v-v-j)*BiCubicPoly(real_w - w - i);
+					}
+			}
+			value = checkColorSpace(value);
 			*(pRealData + pit * y + x * bitCount + off) = value;
 		}
 	}
@@ -209,45 +374,45 @@ UINT ImageProcess::zoomPicture(LPVOID  p)
 	ThreadParam* param = (ThreadParam*)p;
 	int maxWidth = param->src->GetWidth();
 	int maxHeight = param->src->GetHeight();
-	//ÊäÈë²ÎÊı
-	double factor = 1.5;// Ëõ·ÅµÄ´óĞ¡
-	short type = 1;//0 ×î½üÁÚÄÚ²åÖµ ;1 ¶ş½×ÏßĞÔ²åÖµ
+	//è¾“å…¥å‚æ•°
+	double factor = 1.5;// ç¼©æ”¾çš„å¤§å°
+	short type = 2;//0 æœ€è¿‘é‚»å†…æ’å€¼ ;1 äºŒé˜¶çº¿æ€§æ’å€¼
 
 	int startIndex = param->startIndex;
 	int endIndex = param->endIndex;
 	byte* pRealData = (byte*)param->src->GetBits();
-	byte* pOriginData = (byte*)param->origin_src->GetBits();//param->origin_srcÖ¸µÄÊÇÔ­Í¼Ïñ£¬ÕâÀï²»»á¶ÔËü½øĞĞ²Ù×÷
+	byte* pOriginData = (byte*)param->origin_src->GetBits();//param->origin_srcæŒ‡çš„æ˜¯åŸå›¾åƒï¼Œè¿™é‡Œä¸ä¼šå¯¹å®ƒè¿›è¡Œæ“ä½œ
 	int bitCount = param->src->GetBPP() / 8;
 	int pit = param->src->GetPitch();
-	for (int i = startIndex; i <= endIndex; ++i)//É¨ÃèÊä³öÏñËØµÄÎ»ÖÃ£¬²¢ÔÚÃ¿Ò»¸öÎ»ÖÃ£¨x,y£©Ê¹ÓÃ(v,w) = T^(-1)(x,y)¼ÆËãÊäÈëÍ¼ÏñÖĞµÄÏàÓ¦Î»ÖÃ
+	for (int i = startIndex; i <= endIndex; ++i)//æ‰«æè¾“å‡ºåƒç´ çš„ä½ç½®ï¼Œå¹¶åœ¨æ¯ä¸€ä¸ªä½ç½®ï¼ˆx,yï¼‰ä½¿ç”¨(v,w) = T^(-1)(x,y)è®¡ç®—è¾“å…¥å›¾åƒä¸­çš„ç›¸åº”ä½ç½®
 	{
-		//x,yÊÇÏñËØµÄË÷Òı?
+		//x,yæ˜¯åƒç´ çš„ç´¢å¼•?
 		int x = i % maxWidth;
 		int y = i / maxWidth;
-		//v,wÊÇÔ­Í¼ÏñÖĞÏñËØµÄ×ø±ê
+		//v,wæ˜¯åŸå›¾åƒä¸­åƒç´ çš„åæ ‡
 		double real_v = x*factor;
 		double real_w = y*factor;
-		//ÔÚÃ¿Ò»¸öÎ»ÖÃ£¨x,y£©Ê¹ÓÃ(v,w) = T^(-1)(x,y)¼ÆËãÊäÈëÍ¼ÏñÖĞµÄÏàÓ¦Î»ÖÃ 
-		int value = 0;
+		//åœ¨æ¯ä¸€ä¸ªä½ç½®ï¼ˆx,yï¼‰ä½¿ç”¨(v,w) = T^(-1)(x,y)è®¡ç®—è¾“å…¥å›¾åƒä¸­çš„ç›¸åº”ä½ç½® 
+		double value = 0;
 		int v, w;
-		for (int off = 0; off < bitCount; off++) {//RGBÍ¼ºóÃæµÄÆäËûÍ¨µÀ¸³Öµ
-			if (type == 0) {//×î½üÁÚÄÚ²åÖµ
-							//È¡×î½üµÄµã double×ªÎªint»òĞíÊÇÖ±½ÓÉáÈ¥Ğ¡Êı²¿·Ö ÕâÀï²»È·¶¨
+		for (int off = 0; off < bitCount; off++) {//RGBå›¾åé¢çš„å…¶ä»–é€šé“èµ‹å€¼
+			if (type == 0) {//æœ€è¿‘é‚»å†…æ’å€¼
+							//å–æœ€è¿‘çš„ç‚¹ doubleè½¬ä¸ºintæˆ–è®¸æ˜¯ç›´æ¥èˆå»å°æ•°éƒ¨åˆ† è¿™é‡Œä¸ç¡®å®š
 				v = real_v;
 				w = real_w;
-				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//ÈôÃ»³¬³ö±ß½çµÄ»°
+				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//è‹¥æ²¡è¶…å‡ºè¾¹ç•Œçš„è¯
 					value = *(pOriginData + pit * w + v * bitCount + off);
 			}
-			else if (type == 1) {//Ë«ÏßĞÔ²åÖµ f(x , y) = f(X + u, Y + v) =f (X, Y)  * (1 - u) * (1 - v) + f(X, Y + 1) * (1 - u) * v + f(X + 1, Y) * u * (1 - v) + f (X + 1, Y + 1) * u * v;
-								 //È¡ÕûÊı²¿·Ö
+			else if (type == 1) {//åŒçº¿æ€§æ’å€¼ f(x , y) = f(X + u, Y + v) =f (X, Y)  * (1 - u) * (1 - v) + f(X, Y + 1) * (1 - u) * v + f(X + 1, Y) * u * (1 - v) + f (X + 1, Y + 1) * u * v;
+								 //å–æ•´æ•°éƒ¨åˆ†
 				v = floor(real_v);
 				w = floor(real_w);
-				//ÉèuÓëk·Ö±ğÎªX + u£¬Y + kµÄĞ¡Êı²¿·Ö
+				//è®¾uä¸kåˆ†åˆ«ä¸ºX + uï¼ŒY + kçš„å°æ•°éƒ¨åˆ†
 				double u = real_v - v;
 				double k = real_w - w;
-				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//ÈôÃ»³¬³ö±ß½çµÄ»°
-					if (v >= 1 && v < maxWidth - 1 && w >= 1 && w < maxHeight - 1) {//·ÀÖ¹Ô½½ç
-																					//ÕıÈ·ÊµÏÖ¶ş½×ÏßĞÔ²åÖµ
+				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//è‹¥æ²¡è¶…å‡ºè¾¹ç•Œçš„è¯
+					if (v >= 1 && v < maxWidth - 1 && w >= 1 && w < maxHeight - 1) {//é˜²æ­¢è¶Šç•Œ
+																					//æ­£ç¡®å®ç°äºŒé˜¶çº¿æ€§æ’å€¼
 						value = 0;
 						value += (*(pOriginData + pit * (w)+(v)* bitCount + off))*(1 - u)*(1 - k);
 						value += (*(pOriginData + pit * (w + 1) + (v)* bitCount + off))*(1 - u)*(k);
@@ -255,6 +420,21 @@ UINT ImageProcess::zoomPicture(LPVOID  p)
 						value += (*(pOriginData + pit * (w + 1) + (v + 1)* bitCount + off))*(u)*(k);
 					}
 			}
+			else if (type == 2) {//åŒä¸‰æ¬¡å†…æ’
+								 //å–æ•´æ•°éƒ¨åˆ†
+				v = floor(real_v);
+				w = floor(real_w);
+				if ((value = normaliseXY(v, w, maxWidth, maxHeight)) != 0)//è‹¥æ²¡è¶…å‡ºè¾¹ç•Œçš„è¯
+					if (v >= 2 && v < maxWidth - 2 && w >= 2 && w < maxHeight - 2) {//é˜²æ­¢è¶Šç•Œ														
+																					//å®ç°åŒä¸‰æ¬¡å†…æ’
+						value = 0;
+						//4*4é¢†åŸŸç‚¹æ“ä½œ
+						for (int i = -1; i<3; i++)
+							for (int j = -1; j<3; j++)
+								value += (*(pOriginData + pit * (w + i) + (v + j)* bitCount + off))*BiCubicPoly(real_v - v - j)*BiCubicPoly(real_w - w - i);
+					}
+			}
+			value = checkColorSpace(value);
 			*(pRealData + pit * y + x * bitCount + off) = value;
 		}
 	}
@@ -265,17 +445,17 @@ UINT ImageProcess::zoomPicture(LPVOID  p)
 UINT ImageProcess::addNoise(LPVOID  p)
 {
 	ThreadParam* param = (ThreadParam*)p;
-	//Í¼ÏñµÄÕû¸ö¿í¶ÈºÍ¸ß¶È
+	//å›¾åƒçš„æ•´ä¸ªå®½åº¦å’Œé«˜åº¦
 	int maxWidth = param->src->GetWidth();
 	int maxHeight = param->src->GetHeight();
 
 	int startIndex = param->startIndex;
 	int endIndex = param->endIndex;
-	//GetBits() »ñµÃÊı¾İÇøµÄÖ¸Õë
+	//GetBits() è·å¾—æ•°æ®åŒºçš„æŒ‡é’ˆ
 	byte* pRealData = (byte*)param->src->GetBits();
-	//GetBPP() ·µ»ØÃ¿¸öÏñËØËùÕ¼µÄbitÊı£¬ÔÚÕâÀï/8ÒâÎ¶×ÅbitCountÊÇÃ¿¸öÏñËØËùÕ¼µÄbyteÊı
+	//GetBPP() è¿”å›æ¯ä¸ªåƒç´ æ‰€å çš„bitæ•°ï¼Œåœ¨è¿™é‡Œ/8æ„å‘³ç€bitCountæ˜¯æ¯ä¸ªåƒç´ æ‰€å çš„byteæ•°
 	int bitCount = param->src->GetBPP() / 8;
-	//»ñµÃÍ¼ÏñÊı¾İÃ¿Ò»ĞĞµÄ×Ö½ÚÊı
+	//è·å¾—å›¾åƒæ•°æ®æ¯ä¸€è¡Œçš„å­—èŠ‚æ•°
 	//The pitch of the image.If the return value is negative, the bitmap is a bottom - up DIB and its origin is the lower left corner.
 	//	If the return value is positive, the bitmap is a top - down DIB and its origin is the upper left corner.
 	int pit = param->src->GetPitch();
@@ -284,22 +464,22 @@ UINT ImageProcess::addNoise(LPVOID  p)
 	{
 		int x = i % maxWidth;
 		int y = i / maxWidth;
-		if ((rand() % 1000) * 0.001 < NOISE)//Ëæ»úÊÂ¼ş£ºÌí¼ÓÔëÉù
+		if ((rand() % 1000) * 0.001 < NOISE)//éšæœºäº‹ä»¶ï¼šæ·»åŠ å™ªå£°
 		{
 			int value = 0;
 			if (rand() % 1000 < 500)
 			{
-				value = 0;//ºÚµã
+				value = 0;//é»‘ç‚¹
 			}
 			else
 			{
-				value = 255;//°×µã
+				value = 255;//ç™½ç‚¹
 			}
-			if (bitCount == 1)//ÈôÊÇ255Î»²ÊÉ«Í¼Ïñ
+			if (bitCount == 1)//è‹¥æ˜¯255ä½å½©è‰²å›¾åƒ
 			{
 				*(pRealData + pit * y + x * bitCount) = value;
 			}
-			else//ÕâÀïÖ¸µÄ¾ÍÊÇRGB 255*255*255Õæ²ÊÉ«
+			else//è¿™é‡ŒæŒ‡çš„å°±æ˜¯RGB 255*255*255çœŸå½©è‰²
 			{
 				*(pRealData + pit * y + x * bitCount) = value;
 				*(pRealData + pit * y + x * bitCount + 1) = value;
@@ -311,3 +491,4 @@ UINT ImageProcess::addNoise(LPVOID  p)
 	::PostMessage(AfxGetMainWnd()->GetSafeHwnd(), WM_NOISE, 1, NULL);
 	return 0;
 }
+
