@@ -7,6 +7,14 @@
 #endif
 //  Degrees-to-radians constant 
 const double  DegreesToRadians = M_PI / 180.0;
+//自动色阶均衡所用参数
+struct ColorBalanceParam {
+	int shadow;//输入黑场
+	int highlight;//输入白场
+	double midtones;//输入灰场
+	int outHightlight;//输出白场
+	int outShadow;//输出黑场
+};
 struct ThreadParam
 {
 	CImage * src;
@@ -14,6 +22,13 @@ struct ThreadParam
 	int startIndex;
 	int endIndex;
 	int maxSpan;//为模板中心到边缘的距离
+	double angle;//旋转的角度
+	double zoom_factor;//缩放因子
+	double alpha;//合成的时候的alpha值
+	double R_sum;//R通道分量总和
+	double G_sum;
+	double B_sum;
+	ColorBalanceParam * colorBalanceParam;
 };
 
 static bool GetValue(int p[], int size, int &value);
@@ -22,6 +37,7 @@ class ImageProcess
 {
 public:
 	static UINT medianFilter(LPVOID  param);
+	static UINT bilateralFilter(LPVOID p);
 	static UINT addNoise(LPVOID param);
 	static UINT whiteBalance(LPVOID p);
 	static UINT colorBalance(LPVOID p);

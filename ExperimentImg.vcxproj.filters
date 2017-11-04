@@ -50,6 +50,9 @@
     <ClCompile Include="ImageProcess.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="ImageProcessAdapter.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ExperimentImg.rc">
@@ -60,6 +63,7 @@
     <None Include="res\ExperimentImg.rc2">
       <Filter>资源文件</Filter>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\ExperimentImg.ico">
