@@ -146,7 +146,23 @@ void CExperimentImgDlg::BilateralFilter()
 	CButton* clb_circulation = ((CButton*)GetDlgItem(IDC_CHECK_CIRCULATION));
 	int circulation = clb_circulation->GetCheck() == 0 ? 1 : 100;
 	startTime = CTime::GetTickCount();
-	bilateralFilter();
+	//获得双线性滤波的参数
+	CEdit * cEdit_mask = ((CEdit*)GetDlgItem(IDC_MASK));
+	CEdit * cEdit_sigma_d = ((CEdit*)GetDlgItem(IDC_SIGMAD));
+	CEdit * cEdit_sigma_r = ((CEdit*)GetDlgItem(IDC_SIGMAR));
+	CString mask_cStr;
+	CString sigma_d_cStr;
+	CString sigma_r_cStr;
+	cEdit_mask->GetWindowTextW(mask_cStr);
+	cEdit_sigma_d->GetWindowTextW(sigma_d_cStr);
+	cEdit_sigma_r->GetWindowTextW(sigma_r_cStr);
+	//
+	BilateralFilterParam * bilateralFilterParam = new BilateralFilterParam();
+	bilateralFilterParam->filter_length = _ttoi(mask_cStr);
+	bilateralFilterParam->sigma_d = _ttof(sigma_d_cStr);
+	bilateralFilterParam->sigma_r = _ttof(sigma_r_cStr);
+
+	bilateralFilter(bilateralFilterParam);
 }
 void CExperimentImgDlg::ImageFusion()
 {
@@ -337,6 +353,25 @@ void CExperimentImgDlg::ZoomImage()
 	}
 }
 //windows多线程
+void CExperimentImgDlg::bilateralFilter(BilateralFilterParam *p)
+{
+	int subLength = m_pImgSrc->GetWidth() * m_pImgSrc->GetHeight() / m_nThreadNum;
+	int h = m_pImgSrc->GetHeight() / m_nThreadNum;
+	int w = m_pImgSrc->GetWidth() / m_nThreadNum;
+	for (int i = 0; i < m_nThreadNum; ++i)
+	{
+		m_pThreadParam[i].startIndex = i * subLength;
+		m_pThreadParam[i].endIndex = i != m_nThreadNum - 1 ?
+			(i + 1) * subLength - 1 : m_pImgSrc->GetWidth() * m_pImgSrc->GetHeight() - 1;
+		m_pThreadParam[i].maxSpan = MAX_SPAN;
+		m_pThreadParam[i].src = m_pImgSrc;
+		m_pThreadParam[i].origin_src = m_pImgCpy;
+		m_pThreadParam[i].bilateralFilterParam = p;
+		//ImageProcess::bilateralFilter(&m_pThreadParam[i]);
+		boost::thread thrd(&ImageProcess::bilateralFilter, &m_pThreadParam[i]);
+		//AfxBeginThread((AFX_THREADPROC)&ImageProcess::bilateralFilter, &m_pThreadParam[i]);
+	}
+}
 void CExperimentImgDlg::AddNoise_WIN()
 {
 	int subLength = m_pImgSrc->GetWidth() * m_pImgSrc->GetHeight() / m_nThreadNum;
@@ -363,21 +398,6 @@ void CExperimentImgDlg::MedianFilter_WIN()
 		m_pThreadParam[i].maxSpan = MAX_SPAN;
 		m_pThreadParam[i].src = m_pImgSrc;
 		AfxBeginThread((AFX_THREADPROC)&ImageProcess::medianFilter, &m_pThreadParam[i]);
-	}
-}
-void CExperimentImgDlg::bilateralFilter()
-{
-	int subLength = m_pImgSrc->GetWidth() * m_pImgSrc->GetHeight() / m_nThreadNum;
-	int h = m_pImgSrc->GetHeight() / m_nThreadNum;
-	int w = m_pImgSrc->GetWidth() / m_nThreadNum;
-	for (int i = 0; i < m_nThreadNum; ++i)
-	{
-		m_pThreadParam[i].startIndex = i * subLength;
-		m_pThreadParam[i].endIndex = i != m_nThreadNum - 1 ?
-			(i + 1) * subLength - 1 : m_pImgSrc->GetWidth() * m_pImgSrc->GetHeight() - 1;
-		m_pThreadParam[i].maxSpan = MAX_SPAN;
-		m_pThreadParam[i].src = m_pImgSrc;
-		AfxBeginThread((AFX_THREADPROC)&ImageProcess::bilateralFilter, &m_pThreadParam[i]);
 	}
 }
 void CExperimentImgDlg::Rotate_WIN(double angle)

@@ -15,6 +15,12 @@ struct ColorBalanceParam {
 	int outHightlight;//输出白场
 	int outShadow;//输出黑场
 };
+struct BilateralFilterParam {
+	//mask的长度
+	int filter_length;
+	double sigma_d ;
+	double sigma_r ;
+};
 struct ThreadParam
 {
 	CImage * src;
@@ -29,6 +35,7 @@ struct ThreadParam
 	double G_sum;
 	double B_sum;
 	ColorBalanceParam * colorBalanceParam;
+	BilateralFilterParam * bilateralFilterParam;
 };
 
 static bool GetValue(int p[], int size, int &value);

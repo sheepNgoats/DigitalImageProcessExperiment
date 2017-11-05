@@ -42,12 +42,12 @@ public:
 	void ColorBalance();
 	void RotateImage();
 	void ZoomImage();
+	void bilateralFilter(BilateralFilterParam * p);
 	void AddNoise_WIN();
 	void ThreadDraw(DrawPara *p);
 	static UINT Update(void* p);
 	void ImageCopy(CImage* pImgSrc, CImage* pImgDrt);
 	void MedianFilter_WIN();
-	void bilateralFilter();
 	void Rotate_WIN(double angle);
 	void WhiteBalance_WIN();
 	void ImageFusion_WIN(double alpha);
@@ -89,4 +89,5 @@ public:
 	CEdit m_shadow;
 	CEdit m_highlight;
 	afx_msg void OnBnClickedButtonReset();
+	CEdit m_sigma_d;
 };

@@ -88,6 +88,28 @@ int normaliseXY(int x, int y, int max_x, int max_y) {
 //		}
 //	}
 //}
+//定义域核
+double d(int i_k, int j_l , double sigama_d) {
+	return exp(-1 * 
+		(pow((i_k), 2) + pow((j_l), 2)) / (2 * pow(sigama_d, 2)));
+}
+//值域核
+double r(int fij,int fkl, double sigama_r) {
+	return exp(-1 *
+		(pow(fij-fkl, 2) / (2 * pow(sigama_r, 2))));
+}
+//double w(int i, int j, int k, int l) {
+//	return d(i,j,k,l,5)*r()
+//}
+
+int checkColorSpace(double x) {
+	if (x > 255)
+		return 255;
+	if (x < 0)
+		return 0;
+	return x;
+}
+
 UINT ImageProcess::bilateralFilter(LPVOID  p)
 {
 	ThreadParam* param = (ThreadParam*)p;
@@ -100,8 +122,33 @@ UINT ImageProcess::bilateralFilter(LPVOID  p)
 	int maxLength = (maxSpan * 2 + 1) * (maxSpan * 2 + 1);
 
 	byte* pRealData = (byte*)param->src->GetBits();
+	byte* pOriginData = (byte*)param->origin_src->GetBits();//param->origin_src指的是原图像
 	int pit = param->src->GetPitch();
 	int bitCount = param->src->GetBPP() / 8;
+
+	int filter_length = param->bilateralFilterParam->filter_length;
+	double sigma_d = param->bilateralFilterParam->sigma_d;
+	double sigma_r = param->bilateralFilterParam->sigma_r;
+
+	for (int a = startIndex; a <= endIndex; ++a) {
+		int x = a % maxWidth;
+		int y = a / maxWidth;
+		for (int off = 0; off < bitCount; off++) {//bitCount = 1 意味着这是灰度图255位，若bitCount = 3 则意味着这是RGB（比如）图，将分别对3byte的数据一byte一byte赋值
+			//获得输出像素点的值：g(i,j)
+			double temp1 = 0, temp2 = 0;
+			if (x >= filter_length && x < maxWidth - filter_length && y >= filter_length && y < maxHeight - filter_length) {//防止越界
+				for (int k = -1* filter_length; k <= filter_length;k++)
+					for (int l = -1* filter_length; l <= filter_length; l++) {
+						//这里用原图像的像素，这样避免了多线程滤波的时候像素相互影响
+						int fij = *(pRealData + pit * (y)+(x)* bitCount + off);
+						int fkl = *(pRealData + pit * (y + l) + (x + k) * bitCount + off);
+						temp1 += fkl*d(k, l, sigma_d)*r(fij, fkl, sigma_r);
+						temp2 += d(k, l, sigma_d)*r(fij, fkl, sigma_r);
+					}
+			}
+			*(pRealData + pit * y + x * bitCount + off) = checkColorSpace(temp1/temp2);
+		}
+	}
 
 	//cv::Mat image = cv::imread("pic.jpg");
 	//cv::Mat out;
@@ -223,13 +270,7 @@ float BiCubicPoly(float x)
 		return 0.0;
 }
 
-int checkColorSpace(double x) {
-	if (x > 255)
-		return 255;
-	if (x < 0)
-		return 0;
-	return x;
-}
+
 UINT ImageProcess::whiteBalance(LPVOID  p)
 {
 	ThreadParam* param = (ThreadParam*)p;
