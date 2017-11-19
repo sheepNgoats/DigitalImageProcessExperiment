@@ -39,6 +39,9 @@ struct ThreadParam
 };
 
 static bool GetValue(int p[], int size, int &value);
+int normaliseXY(int x, int y, int max_x, int max_y);
+float BiCubicPoly(float x);
+int checkColorSpace(double x);
 
 class ImageProcess
 {

@@ -55,7 +55,13 @@ public:
 	void Zoom_WIN(double zoom_factor);
 	void ImageFusion_BOOST(double alpha);
 	LRESULT OnMedianFilterThreadMsgReceived(WPARAM wParam, LPARAM lParam);
-	afx_msg LRESULT OnNoiseThreadMsgReceived(WPARAM wParam, LPARAM lParam); 
+	afx_msg LRESULT OnNoiseThreadMsgReceived(WPARAM wParam, LPARAM lParam);
+
+	void Rotate_And_Scale_CL(int * pixel, int * pixelIndex, int width, int height, double angle, double factor);
+
+	char * LoadProgSource(const char * cFilename, const char * cPreamble, size_t * szFinalLength);
+
+	size_t RoundUp(int groupSize, int globalSize);
 
 // 实现
 protected:
@@ -65,6 +71,9 @@ protected:
 	int m_nThreadNum;
 	ThreadParam* m_pThreadParam;
 	CTime startTime;
+	//使用clock()函数计时
+	double timeStart;
+	double timeEnd;
 	CString filePath;//一直保存着原始图像的路径，除非打开新的图片
 //	ThreadParam * m_pThreadParam;
 	// 生成的消息映射函数

@@ -143,6 +143,7 @@ BOOL CExperimentImgDlg::OnInitDialog()
 	cmb_thread->InsertString(0, _T("WIN¶àÏß³Ì"));
 	cmb_thread->InsertString(1, _T("OpenMP"));
 	cmb_thread->InsertString(2, _T("CUDA"));
+	cmb_thread->InsertString(3, _T("OpenCL"));
 	cmb_thread->SetCurSel(0);
 
 	CSliderCtrl * slider = ((CSliderCtrl*)GetDlgItem(IDC_SLIDER_THREADNUM));

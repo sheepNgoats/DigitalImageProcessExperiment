@@ -57,6 +57,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 9.0.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -116,6 +117,7 @@
       <PreprocessorDefinitions>_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <OpenMPSupport>true</OpenMPSupport>
+      <AdditionalOptions>/D_CRT_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -212,11 +214,18 @@
     <ResourceCompile Include="ExperimentImg.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="add_vector.cl" />
+    <None Include="rotate_and_scale.cl" />
     <None Include="packages.config" />
     <None Include="res\ExperimentImg.rc2" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\ExperimentImg.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="rotate_and_scale.cu" />
+    <CudaCompile Include="test_kernel.cu" />
+    <CudaCompile Include="white_balance.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
@@ -263,6 +272,7 @@
     <Import Project="..\packages\boost_wserialization-vc140.1.65.1.0\build\native\boost_wserialization-vc140.targets" Condition="Exists('..\packages\boost_wserialization-vc140.1.65.1.0\build\native\boost_wserialization-vc140.targets')" />
     <Import Project="..\packages\boost_zlib-vc140.1.65.1.0\build\native\boost_zlib-vc140.targets" Condition="Exists('..\packages\boost_zlib-vc140.1.65.1.0\build\native\boost_zlib-vc140.targets')" />
     <Import Project="..\packages\boost-vc140.1.65.1.0\build\native\boost-vc140.targets" Condition="Exists('..\packages\boost-vc140.1.65.1.0\build\native\boost-vc140.targets')" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 9.0.targets" />
   </ImportGroup>
   <ProjectExtensions>
     <VisualStudio>

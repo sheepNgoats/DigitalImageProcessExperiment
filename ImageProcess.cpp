@@ -149,12 +149,6 @@ UINT ImageProcess::bilateralFilter(LPVOID  p)
 			*(pRealData + pit * y + x * bitCount + off) = checkColorSpace(temp1/temp2);
 		}
 	}
-
-	//cv::Mat image = cv::imread("pic.jpg");
-	//cv::Mat out;
-	//cv::bilateralFilter(image, out, 25, 25 * 2, 25 / 2);
-
-	//MatToCImage(out, *(param->src));
 	::PostMessage(AfxGetMainWnd()->GetSafeHwnd(), WM_MEDIAN_FILTER, 1, NULL);
 	return 0;
 }
@@ -288,16 +282,6 @@ UINT ImageProcess::whiteBalance(LPVOID  p)
 	//The pitch of the image.If the return value is negative, the bitmap is a bottom - up DIB and its origin is the lower left corner.
 	//	If the return value is positive, the bitmap is a top - down DIB and its origin is the upper left corner.
 	int pit = param->src->GetPitch();
-	//此操作不能在单个线程这里执行
-	//double R = 0, G = 0, B = 0;//整个图像的RGB分量总和
-	//for (int i = startIndex; i <= endIndex; ++i)
-	//{
-	//	int x = i % maxWidth;
-	//	int y = i / maxWidth;
-	//	B += *(pRealData + pit * y + x * bitCount + 0);
-	//	G += *(pRealData + pit * y + x * bitCount + 1);
-	//	R += *(pRealData + pit * y + x * bitCount + 2);
-	//}
 	double R = param->R_sum;//整个图像的RGB分量总和
 	double G = param->G_sum;//整个图像的RGB分量总和
 	double B = param->B_sum;//整个图像的RGB分量总和
@@ -319,13 +303,6 @@ UINT ImageProcess::whiteBalance(LPVOID  p)
 }
 UINT ImageProcess::colorBalance(LPVOID  p)
 {
-	//输入参数
-	//int shadow = 40;//输入黑场
-	//int highlight = 200;//输入白场
-	//double midtones = 0.5;//输入灰场 ???
-	//int outHightlight = 255;
-	//int outShadow = 0;
-
 	ThreadParam* param = (ThreadParam*)p;
 	//图像的整个宽度和高度
 	int maxWidth = param->src->GetWidth();
@@ -508,20 +485,21 @@ UINT ImageProcess::zoomPicture(LPVOID  p)
 		int x = i % maxWidth;
 		int y = i / maxWidth;
 		//v,w是原图像中像素的坐标
-		double real_v = x/factor;
-		double real_w = y/factor;
+		double real_v = x/factor ;
+		double real_w = y/factor ;
 		//在每一个位置（x,y）使用(v,w) = T^(-1)(x,y)计算输入图像中的相应位置 
 		double value = 0;
 		int v, w;
 		for (int off = 0; off < bitCount; off++) {//RGB图后面的其他通道赋值
-			if (type == 0) {//最近邻内插值
+			if (type == 0) {
 							//取最近的点 double转为int或许是直接舍去小数部分 这里不确定
 				v = real_v;
 				w = real_w;
 				if ((value = normaliseXY(v, w, origin_maxWidth, origin_maxHeight)) != 0)//若没超出边界的话
 					value = *(pOriginData + origin_pit * w + v * bitCount + off);
 			}
-			else if (type == 1) {//双线性插值 f(x , y) = f(X + u, Y + v) =f (X, Y)  * (1 - u) * (1 - v) + f(X, Y + 1) * (1 - u) * v + f(X + 1, Y) * u * (1 - v) + f (X + 1, Y + 1) * u * v;
+			//最近邻内插值
+			else if (type == 1) {
 								 //取整数部分
 				v = floor(real_v);
 				w = floor(real_w);
@@ -538,6 +516,7 @@ UINT ImageProcess::zoomPicture(LPVOID  p)
 						value += (*(pOriginData + origin_pit * (w + 1) + (v + 1)* bitCount + off))*(u)*(k);
 					}
 			}
+			//双线性插值 f(x , y) = f(X + u, Y + v) =f (X, Y)  * (1 - u) * (1 - v) + f(X, Y + 1) * (1 - u) * v + f(X + 1, Y) * u * (1 - v) + f (X + 1, Y + 1) * u * v;
 			else if (type == 2) {//双三次内插
 								 //取整数部分
 				v = floor(real_v);
@@ -552,8 +531,8 @@ UINT ImageProcess::zoomPicture(LPVOID  p)
 								value += (*(pOriginData + origin_pit * (w + i) + (v + j)* bitCount + off))*BiCubicPoly(real_v - v - j)*BiCubicPoly(real_w - w - i);
 					}
 			}
-			value = checkColorSpace(value);
-			*(pRealData + pit * y + x * bitCount + off) = value;
+			value = checkColorSpace(value);//避免value超过255或者低于0
+			*(pRealData + pit * y + x * bitCount + off) = value;//设置图像的值
 		}
 	}
 	::PostMessage(AfxGetMainWnd()->GetSafeHwnd(), WM_NOISE, 1, NULL);
